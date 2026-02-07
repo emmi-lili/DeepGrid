@@ -4,10 +4,10 @@
   "private": true,
   "description": "DeepGrid — Automated liquidity vaults for DeepBook with token incentive flywheel on Sui",
   "scripts": {
-    "dev": "pnpm --filter app dev",
-    "build": "pnpm --filter app build",
-    "demo:setup": "pnpm --filter scripts run setup",
-    "demo:run": "pnpm --filter scripts run demo",
+    "dev": "pnpm --filter ./app dev",
+    "build": "pnpm --filter ./app build",
+    "demo:setup": "pnpm --filter ./scripts run setup",
+    "demo:run": "pnpm --filter ./scripts run demo",
     "move:build": "cd contracts && sui move build",
     "move:test": "cd contracts && sui move test"
   },
