@@ -2,7 +2,7 @@
 
 **Token-incentivized automated liquidity vaults for DeepBook on Sui.**
 
-> Persistent CLOB liquidity powered by GRID token flywheel — real yield from spreads, buyback-and-burn, and emission rewards that keep vaults running.
+> Persistent CLOB liquidity powered by the GRID token flywheel — real yield from market-making spreads, buyback-and-burn, and emission rewards that keep vaults running.
 
 ---
 
@@ -11,10 +11,10 @@
 Decentralized CLOBs like DeepBook on Sui offer superior price discovery, but suffer from **thin liquidity**:
 
 1. **No incentive to stay** — passive LPs lose to adverse selection with no compensation beyond raw spread.
-2. **High operational cost** — running market-making strategies requires infrastructure, gas, and constant monitoring.
+2. **High operational cost** — running MM strategies requires infrastructure, gas, and constant monitoring.
 3. **Cold-start failure** — new pairs get no liquidity because there's no reward for being first.
 
-Result: wide spreads, poor fills, traders leave, liquidity providers leave — a death spiral.
+Result: wide spreads, poor fills, traders leave, LPs leave — a death spiral.
 
 ## Solution: DeepGrid
 
@@ -27,16 +27,18 @@ DeepGrid combines **automated liquidity vaults** with a **token incentive flywhe
 | **GRID Token** | Emitted to LPs proportional to their share — incentivizes persistent liquidity |
 | **Buyback Engine** | Portion of spread yield buys GRID from market, then burns/redistributes |
 
-The flywheel: **Deposits → Spread Yield → Buyback GRID → Rewards → More Deposits**.
+**The flywheel: Deposits → Spread Yield → Buyback GRID → Rewards → More Deposits.**
+
+The novel insight: existing vaults can place orders, but **nobody uses them without incentives**. Our token engine + buyback makes liquidity **persistent and sustainable**.
 
 ## Why Sui?
 
 | Sui Feature | How DeepGrid Uses It |
 |-------------|---------------------|
-| **Object Model** | Each order, vault, and config is a first-class object with clear ownership |
+| **Object Model** | Each order, vault, and share is a first-class object with clear ownership |
 | **Shared Objects** | Vault and orderbook are shared objects enabling concurrent access |
 | **Low Latency (~400ms)** | Enables near-real-time rebalancing for tight spreads |
-| **Programmable Transaction Blocks** | Batch deposit + rebalance + claim in a single atomic tx |
+| **Programmable TX Blocks** | Batch deposit + rebalance + claim in a single atomic tx |
 | **DeepBook (Native CLOB)** | Purpose-built on-chain orderbook — no off-chain matching needed |
 | **Move Language** | Linear type system prevents double-spend of coins/shares |
 
@@ -44,7 +46,7 @@ The flywheel: **Deposits → Spread Yield → Buyback GRID → Rewards → More 
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                      DeepGrid Protocol                   │
+│                    DeepGrid Protocol                     │
 │                                                          │
 │  ┌──────────┐   ┌─────────────┐   ┌──────────────────┐  │
 │  │  Vault   │──▶│  Strategy   │──▶│  MockDeepBook    │  │
@@ -71,12 +73,25 @@ The flywheel: **Deposits → Spread Yield → Buyback GRID → Rewards → More 
 ```
 deepgrid/
 ├── contracts/          # Sui Move smart contracts
-│   └── sources/        # Move modules (vault, incentive, strategy, mock_deepbook)
+│   └── sources/
+│       ├── vault.move          # Vault shared object (deposit/withdraw/shares)
+│       ├── grid_token.move     # GRID coin type (OTW, mint/burn)
+│       ├── incentive.move      # Reward-per-share emission engine
+│       ├── mock_deepbook.move  # Simulated CLOB orderbook
+│       ├── strategy.move       # Rebalance + settle logic
+│       └── buyback.move        # Fee split + buyback-and-burn
 ├── app/                # Next.js frontend
 │   └── src/
+│       ├── app/        # Pages: home, vault, incentives, demo
+│       ├── components/ # Navbar, Card, StatBox
+│       ├── providers/  # Sui dapp-kit provider
+│       └── lib/        # Constants, deployed addresses
 ├── scripts/            # TypeScript deploy & demo scripts
 │   └── src/
-├── docs/               # Architecture diagrams & writeup
+│       ├── config.ts   # Network config, Sui client helpers
+│       ├── setup.ts    # Deploy + initialize all objects
+│       └── demo.ts     # Full flywheel demo sequence
+├── docs/               # Architecture, pitch, demo checklist
 └── README.md
 ```
 
@@ -100,17 +115,15 @@ pnpm install
 pnpm move:build
 ```
 
-### Run Demo
+### Run Demo (Localnet)
 
 ```bash
-# Start localnet in another terminal:
+# Terminal 1: Start localnet
 sui start --with-faucet
 
-# Deploy and initialize:
-pnpm demo:setup
-
-# Run full demo flow:
-pnpm demo:run
+# Terminal 2: Deploy and run demo
+NETWORK=localnet pnpm demo:setup
+NETWORK=localnet pnpm demo:run
 ```
 
 ### Run UI
@@ -122,13 +135,37 @@ pnpm dev
 
 ## Demo Flow
 
-1. **Deploy** — Publish Move package, create Vault + StrategyConfig + MockDeepBook
-2. **Deposit** — User deposits SUI + USDC into vault, receives share tokens
-3. **Rebalance** — Keeper calls rebalance(), places orders around mid-price
-4. **Trade** — Simulate fills on MockDeepBook
-5. **Settle** — Record spread yield in vault, accrue GRID rewards to LPs
-6. **Buyback** — Portion of yield buys GRID, 50% burn + 50% to reward pool
-7. **Claim** — User claims GRID rewards
+The `demo:run` script executes this deterministic sequence:
+
+1. **Deposit** — 5 SUI each (base + quote) into vault → receive VaultShare
+2. **Rebalance** — Keeper places bid/ask orders around mid-price on MockDeepBook
+3. **Accrue Rewards** — Mint 100 GRID, update reward-per-share accumulator
+4. **Simulate Trade** — Price moves up → ask orders fill → spread yield earned
+5. **Settle** — Filled orders credited to vault, spread recorded as fees
+6. **Buyback** — Fee split (60% LP / 40% buyback) → buy GRID → 50% burn, 50% rewards
+7. **Claim** — User claims GRID rewards proportional to their shares
+
+Each step emits on-chain events and prints tx digests.
+
+## Move Modules
+
+| Module | Key Functions |
+|--------|--------------|
+| `vault` | `create_vault()`, `deposit()`, `withdraw()` |
+| `grid_token` | `mint()`, `burn()`, `total_supply()` |
+| `incentive` | `accrue_rewards()`, `claim_rewards()`, `pending_rewards()` |
+| `mock_deepbook` | `place_order()`, `cancel_all()`, `simulate_trade()` |
+| `strategy` | `rebalance()`, `settle_fills()` |
+| `buyback` | `create_token_market()`, `buy_grid()`, `execute_buyback()` |
+
+## Roadmap
+
+- [ ] Integrate real DeepBook v2/v3 API (replace MockDeepBook)
+- [ ] Multi-pair vault support
+- [ ] Governance: on-chain voting for strategy parameters
+- [ ] Auto-compounding: reinvest GRID rewards
+- [ ] zkLogin for gasless onboarding
+- [ ] Mainnet deployment with real token economics
 
 ## License
 
