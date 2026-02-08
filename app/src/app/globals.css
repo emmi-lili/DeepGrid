@@ -2,52 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground: #0f172a;
-  --background: #f8fafc;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground: #e2e8f0;
-    --background: #020617;
-  }
-}
-
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
-}
-
-/* Smooth transitions for interactive elements */
-button,
-a,
-input {
-  transition-property: color, background-color, border-color, opacity;
-  transition-duration: 150ms;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Custom scrollbar for event lists */
-.overflow-y-auto::-webkit-scrollbar {
-  width: 6px;
-}
-.overflow-y-auto::-webkit-scrollbar-track {
-  background: transparent;
-}
-.overflow-y-auto::-webkit-scrollbar-thumb {
-  background: #94a3b8;
-  border-radius: 3px;
-}
-
-/* dapp-kit wallet button styling overrides */
-[data-dapp-kit] button {
-  font-size: 0.875rem !important;
-  border-radius: 0.5rem !important;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
